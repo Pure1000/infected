@@ -1,6 +1,3 @@
-/**
- * master state
- */
 function allDead () {
     for (let r of players) {
         if (r.health != HealthState.Dead) {
@@ -35,10 +32,8 @@ function gameFace () {
             }
             break
         case GameState.Over:
-            // show id
             basic.showString(playerIcons[playerIcon])
             basic.pause(2000)
-            // show health
             switch (health) {
                 case HealthState.Dead:
                     basic.showIcon(GameIcons.Dead, 2000)
@@ -53,7 +48,6 @@ function gameFace () {
                     basic.showIcon(GameIcons.Healthy, 2000)
                     break
             }
-            // show how infected
             if (infectedBy > -1) {
                 basic.showString(" INFECTED BY")
                 basic.showString(playerIcons[infectedBy])
@@ -62,7 +56,6 @@ function gameFace () {
                 basic.showString(" PATIENT ZERO")
                 basic.pause(2000)
             }
-            // show score
             game.showScore()
             basic.pause(1000)
             break
@@ -74,10 +67,8 @@ signal = radio.receivedPacket(RadioPacketProperty.SignalStrength)
     if (master) {
         switch (incomingMessage.kind) {
             case MessageKind.PairRequest:
-                // register player
                 let n = players.length
                 player(incomingMessage.fromSerialNumber)
-                // show player number if changed
                 if (n != players.length) {
                     basic.showNumber(players.length)
                 }
@@ -85,7 +76,6 @@ signal = radio.receivedPacket(RadioPacketProperty.SignalStrength)
             case MessageKind.HealthValue:
                 let s = player(incomingMessage.fromSerialNumber)
                 s.health = incomingMessage.value
-                // check if all infected
                 if (allDead())
                     gameOver()
                 break
@@ -93,14 +83,12 @@ signal = radio.receivedPacket(RadioPacketProperty.SignalStrength)
     } else {
         switch (incomingMessage.kind) {
             case MessageKind.GameState:
-                // update game state
                 state = incomingMessage.value as GameState
                 break
             case MessageKind.InitialInfect:
                 if (infectedBy < 0 &&
                     incomingMessage.toSerialNumber == control.deviceSerialNumber()) {
-                    // infected by master
-                    infectedBy = 0 // infected my master
+                    infectedBy = 0
                     infectedTime = input.runningTime()
                     health = HealthState.Incubating
                     serial.writeLine(`infected ${control.deviceSerialNumber()}`)
@@ -117,7 +105,6 @@ signal = radio.receivedPacket(RadioPacketProperty.SignalStrength)
             case MessageKind.PairConfirmation:
                 if (!paired && state == GameState.Pairing &&
                     incomingMessage.toSerialNumber == control.deviceSerialNumber()) {
-                    // paired!
                     serial.writeLine(`player paired ==> ${control.deviceSerialNumber()}`)
                     playerIcon = incomingMessage.value
                     paired = true
@@ -171,7 +158,6 @@ serial.writeLine("" + (`game started ${players.length} players`))
         gameOver()
     }
 })
-// get a player instance (creates one as needed)
 function player (id: number) {
     for (let p of players) {
         if (p.id == id) {
@@ -188,18 +174,12 @@ players.push(q)
 }
 let master = false
 let signal = 0
-// local time when infection happened
 let infectedTime = 0
-// player state
 let paired = false
 let players: Player[] = []
-// time before showing symptoms
 let INCUBATION = 20000
-// time before dying off the disease
 let DEATH = 40000
-// db
 let RSSI = -45
-// % probability to transfer disease
 let TRANSMISSIONPROB = 40
 enum GameState {
     Stopped,
@@ -287,9 +267,7 @@ class Player {
 }
 let state = GameState.Stopped
 let patientZero: Player
-// who infected (playerIcon)
 let infectedBy = -1
-// player icon and identity
 let playerIcon = -1
 let health = HealthState.Healthy
 radio.setGroup(42)
@@ -299,7 +277,6 @@ basic.forever(function () {
 if (master) {
         switch (state) {
             case GameState.Pairing:
-                // tell each player they are registered
                 for (const t of players) {
                     message = new Message()
                     message.kind = MessageKind.PairConfirmation
@@ -319,7 +296,6 @@ if (master) {
                     basic.pause(100)
                 } else {
                     serial.writeLine(`patient ${patientZero.id} infected`)
-                    // show startup
                     basic.showIcon(GameIcons.Dead)
                     state = GameState.Running
                 }
@@ -345,7 +321,6 @@ message.send()
     } else {
         switch (state) {
             case GameState.Pairing:
-                // broadcast player id
                 if (playerIcon < 0) {
                     message = new Message()
                     message.kind = MessageKind.PairRequest
@@ -367,12 +342,10 @@ message.send()
                 message.send()
                 break
             case GameState.Running:
-                // update health status
                 if (health != HealthState.Healthy && input.runningTime() - infectedTime > DEATH)
                     health = HealthState.Dead
                 else if (health != HealthState.Healthy && input.runningTime() - infectedTime > INCUBATION)
                     health = HealthState.Sick
-                // transmit disease
                 if (health == HealthState.Incubating || health == HealthState.Sick) {
                     message = new Message()
                     message.kind = MessageKind.TransmitVirus
